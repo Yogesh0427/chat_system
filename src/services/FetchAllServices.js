@@ -1,11 +1,11 @@
 import axios from 'axios'
-const serverURL="http://localhost:3001"
+const serverURL="http://localhost:5000"
 
 async function postData(url,body) 
 {    
     try
     {
-        var response= await axios.post(`${serverURL}/${url}`,body)
+        var response= await axios.post(`${serverURL}${url}`,body)
         var data=response.data
         return data
     }
@@ -18,7 +18,7 @@ async function getData(url)
 {
     try
     {
-        var response=await axios.get(`${serverURL}/${url}`)
+        var response=await axios.get(`${serverURL}${url}`)
         var data=response.data
         return data
     }

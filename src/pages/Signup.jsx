@@ -45,12 +45,6 @@ export default function Signup() {
       setLoading(true);
 
       const res = await postData("/api/signup", formData);
-
-      if (!res || !res.user) {
-        alert(res?.message || "Signup failed");
-        return;
-      }
-
       const user = res.user; // backend returns { message, user }
 
       // ✅ Save user in localStorage
@@ -62,7 +56,7 @@ export default function Signup() {
       navigate("/chat");
 
     } catch (error) {
-      console.error(error);
+      // console.error(error);
       alert(error.response?.data?.message || "Signup failed");
     } finally {
       setLoading(false);

@@ -1,9 +1,9 @@
 import { Box, useMediaQuery } from "@mui/material";
 import ChatList from "../components/ChatList";
 import ChatWindow from "../components/ChatWindow";
-import { useEffect, useState } from "react";
+import { useEffect,useRef, useState } from "react";
 import { postData } from "../services/FetchAllServices";
-
+import { connectSocket } from "../services/socketIo";
 export default function Chat() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [chatSugestionList, setChatSugestionList] = useState([]);
@@ -14,14 +14,29 @@ export default function Chat() {
 
   const fetchAllChatSugetion = async () => {
     try {
-      console.log("Fetching chat users...");
+      // console.log("Fetching chat users...");
       const res = await postData("/api/chat/fetch_all_chaters", { role });
-      console.log(res);
+      // console.log(res);
       if (res) setChatSugestionList(res);
     } catch (err) {
       console.error("Fetch chat users error:", err);
     }
   };
+
+
+    const socket=useRef(null)
+// console.log(user)
+  useEffect(() => {
+  socket.current = connectSocket();
+
+  socket.current.on("connect", () => {
+    socket.current.emit("join", userData.id);
+  });
+
+  return () => {
+    socket.current.disconnect()
+  };
+}, [userData.id])
 
   useEffect(() => {
     fetchAllChatSugetion();
