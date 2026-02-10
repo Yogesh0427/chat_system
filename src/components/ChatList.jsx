@@ -56,7 +56,7 @@ export default function ChatList({ onSelect, isMobile,chatSugestionList}) {
 
             <ListItemText
               primary={u.name}
-              secondary={u.online ? "Online" : "Offline"}
+              // secondary={u.online ? "Online" : "Offline"}
             />
           </ListItem>
         ))}

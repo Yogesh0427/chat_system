@@ -1,6 +1,5 @@
-import {io} from 'socket.io-client'
+import { io } from "socket.io-client";
 
-export function connectSocket()
-{
-    return io('http://localhost:5000')
+export function connectSocket() {
+  return io(`http://${window.location.hostname}:5000`);
 }

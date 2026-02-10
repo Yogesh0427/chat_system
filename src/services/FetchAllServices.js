@@ -1,5 +1,5 @@
 import axios from 'axios'
-const serverURL="http://localhost:5000"
+const serverURL=`http://${window.location.hostname}:5000`
 
 async function postData(url,body) 
 {    

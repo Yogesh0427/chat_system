@@ -5,14 +5,15 @@ import {
   Typography,
   Avatar,
   IconButton,
+  Chip,
 } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 
-// icons
-import PersonIcon from "@mui/icons-material/Person";
-import CallIcon from "@mui/icons-material/Call";
-import VideocamIcon from "@mui/icons-material/Videocam";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import PersonIcon from "@mui/icons-material/Person"
+import CallIcon from "@mui/icons-material/Call"
+import VideocamIcon from "@mui/icons-material/Videocam"
+import ArrowBackIcon from "@mui/icons-material/ArrowBack"
+import AccessTimeIcon from "@mui/icons-material/AccessTime"
 
 import MessageBubble from "./MessageBubble";
 import { connectSocket } from "../services/socketIo";
@@ -20,108 +21,156 @@ import { postData } from "../services/FetchAllServices";
 
 export default function ChatWindow({ user, onBack, isMobile }) {
   const [text, setText] = useState("");
-  const [msg, setMsg] = useState([]);
+  const [messages, setMessages] = useState([]);
   const [conversationId, setConversationId] = useState(null);
-  const [typing, setTyping] = useState("");
+  const [typing, setTyping] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState([]);
+  const [timeLeft, setTimeLeft] = useState(10);
+
   const socket = useRef(null);
-  const messagesEndRef = useRef(null);
+  const typingTimeout = useRef(null);
+  const bottomRef = useRef(null);
 
   const userData = JSON.parse(localStorage.getItem("user"));
 
-  /* ================= SHOW TYPING STATUS ================= */
-  useEffect(() => {
-    if (!socket.current || !socket.current.connected) return;
-
-    if (!text) {
-      socket.current.emit("typing", { userId: userData.id, isTyping: false });
-      return;
-    }
-
-    socket.current.emit("typing", { userId: userData.id, isTyping: true });
-
-    const timeout = setTimeout(() => {
-      socket.current.emit("typing", { userId: userData.id, isTyping: false });
-    }, 1500);
-
-    return () => clearTimeout(timeout);
-  }, [text, userData?.id]);
-
-  
-  /* ================= FETCH OLD CHAT ================= */
-  const fetchOldChat = async () => {
-    if (!userData?.id || !user?.id) return;
-
-    const body = {
-      userId: userData.id,
-      astrologerId: user.id,
-    };
-
-    const conversation = await postData("/api/chat/conversation", body);
-    setConversationId(conversation.id);
-
-    const chats = await postData("/api/chat/messages", {
-      conversationId: conversation.id,
-    });
-
-    setMsg(chats || []);
-  };
-
-  useEffect(() => {
-    fetchOldChat();
-  }, [userData?.id, user?.id]);
-
-  /* ================= SOCKET CONNECT ================= */
+  /* ================= SOCKET INIT (ONLY ONCE) ================= */
   useEffect(() => {
     socket.current = connectSocket();
 
-    socket.current.on("connect", () => {
-      socket.current.emit("join", userData.id);
+    socket.current.emit("join", userData.id);
+    socket.current.emit("addUser", userData.id);
+
+    socket.current.on("getOnlineUsers", setOnlineUsers);
+
+    socket.current.on("newMessage", (msg) => {
+      
+      setMessages((prev) =>
+        prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]
+      );
     });
 
-    socket.current.on("newMessage", (message) => {
-      setMsg((prev) => {
-        // Remove optimistic message with same tempId if exists
-        const filtered = prev.filter(
-          (m) => m.optimistic !== true || m.id !== message.tempId
-        );
-        return [...filtered, message];
-      });
+    socket.current.on("messageStatus", ({ messageId, status }) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId || m.tempId === messageId
+            ? { ...m, status }
+            : m
+        )
+      );
     });
 
-    socket.current.on("typing", ({ userId, isTyping }) => {
-      if (userId !== userData.id) {
-        setTyping(isTyping ? "Typing..." : "");
+    socket.current.on("typing", ({ conversationId, senderId, isTyping }) => {
+      if (senderId !== userData.id) {
+        setTyping(isTyping);
       }
     });
 
-    return () => {
-      socket.current.disconnect();
-    };
+    return () => socket.current.disconnect();
   }, []);
 
-  /* ================= AUTO SCROLL ================= */
+  /* ================= FETCH CHAT ================= */
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [msg]);
+    if (!user?.id) return;
 
-  /* ================= SEND MESSAGE ================= */
-  const handleSendMsg = async () => {
-    if (!text.trim() || !conversationId) return;
+    (async () => {
+      const conv = await postData("/api/chat/conversation", {
+        userId: userData.id,
+        astrologerId: user.id,
+      });
 
-    const messagePayload = {
+      setConversationId(conv.id);
+      socket.current.emit("joinConversation", conv.id);
+
+      const chats = await postData("/api/chat/messages", {
+        conversationId: conv.id,
+      });
+
+      setMessages(chats || []);
+    })();
+  }, [user?.id]);
+
+  /* ================= SEEN + SCROLL ================= */
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+
+    if (conversationId) {
+      socket.current.emit("seen", {
+        conversationId,
+        userId: userData.id,
+      });
+    }
+  }, [messages]);
+
+  /* ================= TIMER ================= */
+  useEffect(() => {
+    if (timeLeft <= 0) return;
+    const timer = setInterval(() => {
+      setTimeLeft((t) => t - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [timeLeft]);
+
+  const formatTime = (sec) =>
+    `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(
+      sec % 60
+    ).padStart(2, "0")}`;
+
+  /* ================= SEND ================= */
+  const handleSend = () => {
+    if (!text.trim() || timeLeft <= 0) return;
+
+    const tempId = Date.now();
+
+    // setMessages((prev) => [
+    //   ...prev,
+    //   {
+    //     tempId,
+    //     message: text,
+    //     sender_id: userData.id,
+    //     status: "sent",
+    //   },
+    // ]);
+
+    socket.current.emit("sendMessage", {
       conversationId,
       senderId: userData.id,
       receiverId: user.id,
       message: text,
-    };
+    });
 
-    setText(""); // clear input
-
-    socket.current.emit("sendMessage", messagePayload);
+    setText("");
   };
 
-  /* ================= UI ================= */
-  if (!user) return <Box sx={{ flex: 1, p: 3 }}>Select a chat</Box>;
+  /* ================= TYPING (INSTANT) ================= */
+  const handleTyping = (e) => {
+    setText(e.target.value);
+
+    socket.current.emit("typing", {
+      conversationId,
+      senderId: userData.id,
+      receiverId: user.id,
+      isTyping: true,
+    });
+
+    clearTimeout(typingTimeout.current);
+    typingTimeout.current = setTimeout(() => {
+      socket.current.emit("typing", {
+        conversationId,
+        senderId: userData.id,
+        receiverId: user.id,
+        isTyping: false,
+      });
+    }, 700);
+  };
+
+  const isOnline = onlineUsers.includes(user?.id);
+
+  const handlePayment = () => {
+    alert("Payment Successful")
+    setTimeLeft(120)
+  };
+
+  if (!user) return <Box p={3}>Select chat</Box>
 
   return (
     <Box sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
@@ -129,61 +178,69 @@ export default function ChatWindow({ user, onBack, isMobile }) {
       <Box
         sx={{
           p: 2,
-          borderBottom: "1px solid #ddd",
+          borderBottom: "1px solid #eee",
           display: "flex",
-          alignItems: "center",
           justifyContent: "space-between",
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "center", flexDirection: "column", flex: 1 }}>
-          <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
-            {isMobile && (
-              <IconButton onClick={onBack} sx={{ mr: 1 }}>
-                <ArrowBackIcon />
-              </IconButton>
-            )}
-            <Avatar sx={{ width: 40, height: 40, mr: 1 }}>
-              <PersonIcon />
-            </Avatar>
-            <Box>
-              <Typography variant="h6">{user.name}</Typography>
-              <Typography variant="body2" color="textSecondary">
-                {typing}
-              </Typography>
-            </Box>
+        <Box sx={{ display: "flex", gap: 2 }}>
+          {isMobile && (
+            <IconButton onClick={onBack}>
+              <ArrowBackIcon />
+            </IconButton>
+          )}
+          <Avatar><PersonIcon /></Avatar>
+          <Box>
+            <Typography fontWeight={600}>{user.name}</Typography>
+            <Typography
+              variant="caption"
+              color={typing ? "primary" : isOnline ? "green" : "gray"}
+            >
+              {typing ? "Typing..." : isOnline ? "Online" : "Offline"}
+            </Typography>
           </Box>
         </Box>
 
-        <Box>
-          <IconButton color="primary">
-            <CallIcon />
-          </IconButton>
-          <IconButton color="primary">
-            <VideocamIcon />
-          </IconButton>
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <Chip
+            icon={<AccessTimeIcon />}
+            label={timeLeft > 0 ? formatTime(timeLeft) : "Ended"}
+            color={timeLeft < 30 ? "error" : "primary"}
+            sx={{ fontWeight: 600 }}
+          />
+          <IconButton><CallIcon /></IconButton>
+          <IconButton><VideocamIcon /></IconButton>
         </Box>
       </Box>
 
-      {/* MESSAGES */}
-      <Box sx={{ flex: 1, p: 2, overflowY: "auto" }}>
-        {msg.map((m, i) => (
+      {/* CHAT */}
+      <Box sx={{ flex: 1, overflowY: "auto", p: 2 }}>
+        {messages.map((m, i) => (
           <MessageBubble key={i} msg={m} />
         ))}
-        <div ref={messagesEndRef} />
+        <div ref={bottomRef} />
       </Box>
 
-      {/* INPUT */}
-      <Box sx={{ display: "flex", p: 2, gap: 1 }}>
-        <TextField
-          fullWidth
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Type a message"
-          onKeyDown={(e) => e.key === "Enter" && handleSendMsg()}
-        />
-        <Button variant="contained" onClick={handleSendMsg}>
-          Send
-        </Button>
+      {/* INPUT / PAYMENT */}
+      <Box sx={{ p: 2 }}>
+        {timeLeft > 0 ? (
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <TextField
+              fullWidth
+              value={text}
+              onChange={handleTyping}
+              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              placeholder="Type a message..."
+            />
+            <Button variant="contained" onClick={handleSend}>
+              Send
+            </Button>
+          </Box>
+        ) : (
+          <Button fullWidth variant="contained" color="success" onClick={handlePayment}>
+            Pay & Continue Chat
+          </Button>
+        )}
       </Box>
     </Box>
   );

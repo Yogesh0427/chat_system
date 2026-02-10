@@ -6,8 +6,8 @@ import { postData } from "../services/FetchAllServices";
 import { connectSocket } from "../services/socketIo";
 export default function Chat() {
   const [selectedUser, setSelectedUser] = useState(null);
-  const [chatSugestionList, setChatSugestionList] = useState([]);
-  const userData = JSON.parse(localStorage.getItem("user"));
+  const [chatSugestionList, setChatSugestionList] = useState([])
+  const userData = JSON.parse(localStorage.getItem("user"))
   const role = userData?.role;
 
   const isMobile = useMediaQuery("(max-width:600px)");
@@ -31,11 +31,11 @@ export default function Chat() {
 
   socket.current.on("connect", () => {
     socket.current.emit("join", userData.id);
-  });
+  })
 
   return () => {
     socket.current.disconnect()
-  };
+  }
 }, [userData.id])
 
   useEffect(() => {
