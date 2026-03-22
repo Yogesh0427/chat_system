@@ -10,7 +10,7 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { postData } from '../services/FetchAllServices';
+import { postData } from '../../services/FetchAllServices';
 
 export default function Signup() {
   const navigate = useNavigate();

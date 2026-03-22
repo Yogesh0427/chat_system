@@ -2,8 +2,8 @@ import { Box, useMediaQuery } from "@mui/material";
 import ChatList from "../components/ChatList";
 import ChatWindow from "../components/ChatWindow";
 import { useEffect,useRef, useState } from "react";
-import { postData } from "../services/FetchAllServices";
-import { connectSocket } from "../services/socketIo";
+import { postData } from "../../services/FetchAllServices";
+import { connectSocket } from "../../services/socketIo";
 export default function Chat() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [chatSugestionList, setChatSugestionList] = useState([])

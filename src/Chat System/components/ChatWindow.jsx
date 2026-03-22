@@ -16,8 +16,8 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack"
 import AccessTimeIcon from "@mui/icons-material/AccessTime"
 
 import MessageBubble from "./MessageBubble";
-import { connectSocket } from "../services/socketIo";
-import { postData } from "../services/FetchAllServices";
+import { connectSocket } from "../../services/socketIo";
+import { postData } from "../../services/FetchAllServices";
 
 export default function ChatWindow({ user, onBack, isMobile }) {
   const [text, setText] = useState("");

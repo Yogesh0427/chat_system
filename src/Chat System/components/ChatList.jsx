@@ -7,15 +7,10 @@ import {
   Avatar,
 } from "@mui/material";
 import PersonIcon from "@mui/icons-material/Person";
-import { users } from "../data/users";
 import { useState } from "react";
 
 export default function ChatList({ onSelect, isMobile,chatSugestionList}) {
   const [search, setSearch] = useState("");
-
-  const filteredUsers = users.filter((u) =>
-    u.name.toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
     <Box
